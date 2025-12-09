@@ -1,0 +1,269 @@
+{
+  "info": {
+    "name": "iFeelInColor API",
+    "description": "Complete API collection for iFeelInColor backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@ifeelincolor.com\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Patient Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"patient@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/patient-login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "patient-login"]
+            }
+          }
+        },
+        {
+          "name": "Patient Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\",\n  \"phone\": \"1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/patient-register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "patient-register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Body Assessments",
+      "item": [
+        {
+          "name": "Create Body Assessment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"How does your shoulder feel?\",\n  \"answer\": \"Joyful\",\n  \"type\": \"mcq\",\n  \"score\": 10,\n  \"part\": \"507f1f77bcf86cd799439011\",\n  \"mcqOptions\": [\n    {\n      \"text\": \"Joyful\",\n      \"color\": \"#FFC107\",\n      \"emotionHierarchy\": {\n        \"primary\": {\n          \"id\": \"joy\",\n          \"name\": \"Joy\",\n          \"color\": \"#FFD700\"\n        },\n        \"secondary\": {\n          \"id\": \"content\",\n          \"name\": \"Content\",\n          \"color\": \"#FFD700\"\n        },\n        \"tertiary\": {\n          \"id\": \"joyful\",\n          \"name\": \"Joyful\",\n          \"color\": \"#FFC107\",\n          \"description\": \"Full of happiness\"\n        }\n      }\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bodytest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bodytest"]
+            }
+          }
+        },
+        {
+          "name": "Get All Body Assessments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bodytest",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bodytest"]
+            }
+          }
+        },
+        {
+          "name": "Get Body Assessment by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bodytest/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bodytest", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Body Assessment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Updated question\",\n  \"answer\": \"Updated answer\",\n  \"score\": 20\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bodytest/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bodytest", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Body Assessment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/bodytest/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bodytest", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Take Body Assessment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assessmentId\": \"507f1f77bcf86cd799439011\",\n  \"answer\": \"Joyful\",\n  \"patientId\": \"507f1f77bcf86cd799439012\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/bodytest/take",
+              "host": ["{{base_url}}"],
+              "path": ["api", "bodytest", "take"]
+            }
+          }
+        },
+        {
+          "name": "Get Questions by Part",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/questions/:partId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "questions", ":partId"],
+              "variable": [
+                {
+                  "key": "partId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
+  ]
+}
+
+
+
+
+
+
+
+
+
