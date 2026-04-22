@@ -12,6 +12,15 @@ const {
   updateMeta,
   previewForm,
 } = require("../controllers/feelingsWheelController");
+const {
+  listQuestionnaires,
+  getQuestionnaire,
+  createQuestionnaire,
+  updateQuestionnaire,
+  deleteQuestionnaire,
+  toggleQuestionnaireStatus,
+  reorderQuestionnaires,
+} = require("../controllers/feelingQuestionnaireController");
 
 // ============ PUBLIC ROUTES (No Auth) ============
 router.get("/", getFeelingsWheel);
@@ -29,5 +38,25 @@ router.put("/admin/feelings-wheel/meta", adminAuth, updateMeta);
 
 // Form preview
 router.get("/admin/feelings-wheel/form", adminAuth, previewForm);
+
+router.get("/admin/feeling-questionnaire", adminAuth, listQuestionnaires);
+router.get("/admin/feeling-questionnaire/:id", adminAuth, getQuestionnaire);
+router.post("/admin/feeling-questionnaire", adminAuth, createQuestionnaire);
+router.put("/admin/feeling-questionnaire/:id", adminAuth, updateQuestionnaire);
+router.delete(
+  "/admin/feeling-questionnaire/:id",
+  adminAuth,
+  deleteQuestionnaire,
+);
+router.patch(
+  "/admin/feeling-questionnaire/:id/toggle-status",
+  adminAuth,
+  toggleQuestionnaireStatus,
+);
+router.post(
+  "/admin/feeling-questionnaire/reorder",
+  adminAuth,
+  reorderQuestionnaires,
+);
 
 module.exports = router;

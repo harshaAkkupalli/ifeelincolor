@@ -269,7 +269,7 @@ const getQuestionsByPart = async (req, res) => {
 
 const getQuestionsByParts = async (req, res) => {
   try {
-    const { partIds } = req.body;
+    const { partIds, bodyPartName } = req.body;
 
     // 1. Validate input
     if (!Array.isArray(partIds) || partIds.length === 0) {
@@ -310,7 +310,12 @@ const getQuestionsByParts = async (req, res) => {
     });
 
     // 5. Recursive builder
-    const buildTree = (node, parentColor = null, parentHex = null) => {
+    const buildTree = (
+      node,
+      parentColor = null,
+      parentHex = null,
+      bodyPartName,
+    ) => {
       // ✅ inherit color
       const color = node.colorGroup || parentColor;
       const hex = node.hexCode?.inner ? node.hexCode : parentHex;
@@ -343,6 +348,7 @@ const getQuestionsByParts = async (req, res) => {
         key: node.key,
         label: node.label,
         type: node.type,
+        bodyPartName,
         colorGroup: color,
         hexCode: node.hexCode || {},
         question,
@@ -355,7 +361,7 @@ const getQuestionsByParts = async (req, res) => {
       .map((id) => {
         const node = nodeMap[id];
         if (!node) return null;
-        return buildTree(node);
+        return buildTree(node, null, null, bodyPartName); // ✅ pass here
       })
       .filter(Boolean);
 
