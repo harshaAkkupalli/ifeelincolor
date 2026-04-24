@@ -5,6 +5,7 @@ const {
   saveSelectedQuestions,
   getPatientSelectedQuestions,
   getPatientSelectionByBodyPart,
+  getAllQuestions,
 } = require("../controllers/bodyPartController");
 
 // Get all body parts
@@ -24,4 +25,6 @@ router.get(
   getPatientSelectionByBodyPart,
 );
 
+// Get all questions for all body parts
+router.get("/bodyquestions", getAllQuestions);
 module.exports = router;

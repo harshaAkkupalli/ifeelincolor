@@ -1,4 +1,43 @@
+// models/PatientSelectedQuestions.js
 const mongoose = require("mongoose");
+
+const answerSchema = new mongoose.Schema({
+  questionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
+  question: {
+    type: String,
+    required: true,
+  },
+  answer: {
+    type: mongoose.Schema.Types.Mixed,
+    required: true,
+  },
+  type: {
+    type: String,
+    enum: ["text", "number", "mcq"],
+    default: "text",
+  },
+  score: {
+    type: Number,
+    default: 0,
+  },
+  category: {
+    type: String,
+    default: "",
+  },
+  mcqOptions: [
+    {
+      text: String,
+      isCorrect: Boolean,
+    },
+  ],
+  media: {
+    type: String,
+    default: "",
+  },
+});
 
 const patientSelectedQuestionsSchema = new mongoose.Schema(
   {
@@ -7,59 +46,37 @@ const patientSelectedQuestionsSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    bodyPartId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Body",
-      required: true,
-    },
-    bodyPartName: {
-      type: String,
-      required: true,
-    },
-    questionnaireId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "BodyPartQuestionnaire",
-      required: true,
-    },
-    questionnaireTitle: {
-      type: String,
-      required: true,
-    },
-    selectedQuestions: [
+    selections: [
       {
-        questionId: {
+        bodyPartId: {
           type: mongoose.Schema.Types.ObjectId,
+          ref: "Body",
           required: true,
         },
-        text: {
+        bodyPartName: {
           type: String,
           required: true,
         },
-        type: {
-          type: String,
-          enum: ["text", "number"],
-          default: "text",
+        questionnaireId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "BodyPartQuestionnaire",
+          required: true,
         },
-        required: {
-          type: Boolean,
-          default: true,
+        questionnaireTitle: {
+          type: String,
+          required: true,
+        },
+        selectedQuestions: [answerSchema],
+        selectedAt: {
+          type: Date,
+          default: Date.now,
         },
       },
     ],
-    selectedAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
   {
     timestamps: true,
   },
-);
-
-// Compound index to ensure unique combination of patient, body part, and questionnaire
-patientSelectedQuestionsSchema.index(
-  { patientId: 1, bodyPartId: 1, questionnaireId: 1 },
-  { unique: true },
 );
 
 module.exports = mongoose.model(

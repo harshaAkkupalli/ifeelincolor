@@ -1,3 +1,4 @@
+// controllers/bodyPartController.js
 const BodyPartQuestionnaire = require("../models/BodyPartQuestionnaire");
 const PatientSelectedQuestions = require("../models/PatientSelectedQuestions");
 
@@ -6,7 +7,6 @@ const getQuestionsByBodyPart = async (req, res) => {
   try {
     const { bodyPartId } = req.params;
 
-    // Find questionnaire for this body part
     const questionnaire = await BodyPartQuestionnaire.findOne({
       bodyPart: bodyPartId,
       isActive: true,
@@ -27,7 +27,12 @@ const getQuestionsByBodyPart = async (req, res) => {
           title: questionnaire.title,
           description: questionnaire.description,
           bodyPart: questionnaire.bodyPart,
-          questions: questionnaire.questions,
+          questions: questionnaire.questions.map((q) => ({
+            id: q._id,
+            text: q.text,
+            type: q.type,
+            required: q.required,
+          })),
         },
       },
       message: "Questions retrieved successfully",
@@ -41,14 +46,12 @@ const getQuestionsByBodyPart = async (req, res) => {
   }
 };
 
-// Save selected questions for a patient (patientId from params)
+// Save selected questions for multiple body parts
 const saveSelectedQuestions = async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { bodyPartId, questionnaireId, selectedQuestions, bodyPartName } =
-      req.body;
+    const { selections } = req.body;
 
-    // Validate required fields
     if (!patientId) {
       return res.status(400).json({
         status: "error",
@@ -56,95 +59,91 @@ const saveSelectedQuestions = async (req, res) => {
       });
     }
 
-    if (!bodyPartId || !questionnaireId) {
+    if (!selections || !Array.isArray(selections) || selections.length === 0) {
       return res.status(400).json({
         status: "error",
-        message: "Missing required fields: bodyPartId and questionnaireId",
+        message: "Selections array is required with at least one body part",
       });
     }
 
-    if (!bodyPartName) {
-      return res.status(400).json({
-        status: "error",
-        message: "Missing required field: bodyPartName",
+    // Process each selection
+    const processedSelections = [];
+
+    for (const selection of selections) {
+      const { bodyPartId, bodyPartName, questionnaireId, answers } = selection;
+
+      if (!bodyPartId || !questionnaireId || !answers) {
+        return res.status(400).json({
+          status: "error",
+          message:
+            "Each selection must have bodyPartId, questionnaireId, and answers",
+        });
+      }
+
+      // Check if questionnaire exists
+      const questionnaire =
+        await BodyPartQuestionnaire.findById(questionnaireId);
+      if (!questionnaire) {
+        return res.status(404).json({
+          status: "error",
+          message: `Questionnaire not found for body part: ${bodyPartName}`,
+        });
+      }
+
+      // Process answers
+      const processedAnswers = answers.map((answer) => ({
+        questionId: answer.questionId,
+        question: answer.question,
+        answer: answer.answer,
+        type: answer.type || "text",
+        score: answer.score || 0,
+        category: answer.category || "",
+        mcqOptions: answer.mcqOptions || [],
+        media: answer.media || "",
+      }));
+
+      processedSelections.push({
+        bodyPartId,
+        bodyPartName,
+        questionnaireId,
+        questionnaireTitle: questionnaire.title,
+        selectedQuestions: processedAnswers,
+        selectedAt: new Date(),
       });
     }
 
-    // Check if questionnaire exists
-    const questionnaire = await BodyPartQuestionnaire.findById(questionnaireId);
-    if (!questionnaire) {
-      return res.status(404).json({
-        status: "error",
-        message: "Questionnaire not found",
-      });
-    }
+    // Find or create patient record
+    let patientRecord = await PatientSelectedQuestions.findOne({ patientId });
 
-    // If selectedQuestions provided, filter them, otherwise save all questions
-    let questionsToSave = questionnaire.questions;
-    if (selectedQuestions && selectedQuestions.length > 0) {
-      questionsToSave = questionnaire.questions.filter((q) =>
-        selectedQuestions.includes(q._id.toString()),
-      );
-    }
+    if (patientRecord) {
+      // Update existing selections or add new ones
+      for (const newSelection of processedSelections) {
+        const existingIndex = patientRecord.selections.findIndex(
+          (s) => s.bodyPartId.toString() === newSelection.bodyPartId.toString(),
+        );
 
-    // Prepare the data to save
-    const selectedQuestionsData = {
-      patientId: patientId,
-      bodyPartId: bodyPartId,
-      bodyPartName: bodyPartName,
-      questionnaireId: questionnaireId,
-      questionnaireTitle: questionnaire.title,
-      selectedQuestions: questionsToSave.map((q) => ({
-        questionId: q._id,
-        text: q.text,
-        type: q.type,
-        required: q.required,
-      })),
-      selectedAt: new Date(),
-    };
-
-    // Check if patient already has selected questions for this body part
-    let existingRecord = await PatientSelectedQuestions.findOne({
-      patientId: patientId,
-      bodyPartId: bodyPartId,
-      questionnaireId: questionnaireId,
-    });
-
-    let savedRecord;
-    if (existingRecord) {
-      // Update existing record
-      existingRecord.selectedQuestions =
-        selectedQuestionsData.selectedQuestions;
-      existingRecord.selectedAt = new Date();
-      savedRecord = await existingRecord.save();
+        if (existingIndex !== -1) {
+          // Update existing body part selection
+          patientRecord.selections[existingIndex] = newSelection;
+        } else {
+          // Add new body part selection
+          patientRecord.selections.push(newSelection);
+        }
+      }
+      await patientRecord.save();
     } else {
-      // Create new record
-      const patientSelectedQuestions = new PatientSelectedQuestions(
-        selectedQuestionsData,
-      );
-      savedRecord = await patientSelectedQuestions.save();
+      // Create new patient record
+      patientRecord = new PatientSelectedQuestions({
+        patientId,
+        selections: processedSelections,
+      });
+      await patientRecord.save();
     }
 
     res.status(200).json({
       status: "success",
-      data: {
-        id: savedRecord._id,
-        patientId: savedRecord.patientId,
-        bodyPart: {
-          id: bodyPartId,
-          name: bodyPartName,
-        },
-        questionnaire: {
-          id: questionnaire._id,
-          title: questionnaire.title,
-        },
-        selectedQuestions: questionsToSave,
-        totalQuestions: questionsToSave.length,
-        selectedAt: savedRecord.selectedAt,
-      },
-      message: existingRecord
-        ? "Questions updated successfully"
-        : "Questions selected and saved successfully",
+      data: patientRecord,
+      message: "Selections saved successfully",
     });
   } catch (error) {
     console.error("Error saving selected questions:", error);
@@ -155,7 +154,7 @@ const saveSelectedQuestions = async (req, res) => {
   }
 };
 
-// Get patient's selected questions (patientId from params)
+// Get patient's all selections
 const getPatientSelectedQuestions = async (req, res) => {
   try {
     const { patientId } = req.params;
@@ -167,20 +166,20 @@ const getPatientSelectedQuestions = async (req, res) => {
       });
     }
 
-    const patientSelections = await PatientSelectedQuestions.find({
+    const patientRecord = await PatientSelectedQuestions.findOne({
       patientId: patientId,
-    }).sort({ selectedAt: -1 });
+    });
 
-    if (!patientSelections || patientSelections.length === 0) {
+    if (!patientRecord) {
       return res.status(404).json({
         status: "error",
-        message: "No selected questions found for this patient",
+        message: "No selections found for this patient",
       });
     }
 
     res.status(200).json({
       status: "success",
-      data: patientSelections,
+      data: patientRecord,
       message: "Patient selections retrieved successfully",
     });
   } catch (error) {
@@ -192,7 +191,7 @@ const getPatientSelectedQuestions = async (req, res) => {
   }
 };
 
-// Get specific patient's selection for a body part (patientId from params)
+// Get patient's selection for specific body part
 const getPatientSelectionByBodyPart = async (req, res) => {
   try {
     const { patientId, bodyPartId } = req.params;
@@ -204,17 +203,21 @@ const getPatientSelectionByBodyPart = async (req, res) => {
       });
     }
 
-    const selection = await PatientSelectedQuestions.findOne({
+    const patientRecord = await PatientSelectedQuestions.findOne({
       patientId: patientId,
-      bodyPartId: bodyPartId,
+      "selections.bodyPartId": bodyPartId,
     });
 
-    if (!selection) {
+    if (!patientRecord) {
       return res.status(404).json({
         status: "error",
         message: "No selection found for this patient and body part",
       });
     }
+
+    const selection = patientRecord.selections.find(
+      (s) => s.bodyPartId.toString() === bodyPartId,
+    );
 
     res.status(200).json({
       status: "success",
@@ -230,9 +233,38 @@ const getPatientSelectionByBodyPart = async (req, res) => {
   }
 };
 
+const getAllQuestions = async (req, res) => {
+  try {
+    const assessments = await BodyPartQuestionnaire.find();
+
+    if (!assessments || assessments.length === 0) {
+      return res.status(404).json({
+        status: "error",
+        message: "No questions found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        total: assessments.length,
+        questions: assessments,
+      },
+      message: "All questions retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error fetching all questions:", error);
+    res.status(500).json({
+      status: "error",
+      message: "An error occurred while fetching questions",
+    });
+  }
+};
+
 module.exports = {
   getQuestionsByBodyPart,
   saveSelectedQuestions,
   getPatientSelectedQuestions,
   getPatientSelectionByBodyPart,
+  getAllQuestions,
 };
