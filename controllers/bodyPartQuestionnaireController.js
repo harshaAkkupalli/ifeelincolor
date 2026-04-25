@@ -112,6 +112,46 @@ const updateQuestionnaire = async (req, res) => {
   }
 };
 
+const getAllQuestions = async (req, res) => {
+  try {
+    const data = await BodyPartQuestionnaire.find({ isActive: true })
+      .populate("bodyPart", "partName")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const formatted = data.map((item) => ({
+      questionnaireId: item._id,
+      title: item.title,
+      description: item.description,
+      bodyPartId: item.bodyPart?._id || item.bodyPart,
+      bodyPartName: item.bodyPart?.partName || "",
+      questions: item.questions.map((q) => ({
+        questionId: q._id,
+        text: q.text,
+        type: q.type,
+        required: q.required,
+        options: q.options || [],
+      })),
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
+
+    return res.status(200).json({
+      status: "success",
+      data: {
+        total: formatted.length,
+        questions: formatted,
+      },
+      message: "All questions retrieved successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
 // ====================================
 // Get Questions By Body Parts
 // POST /bodytest/questions
@@ -170,9 +210,9 @@ const getQuestionsByBodyParts = async (req, res) => {
 // Submit Answers
 // POST /bodytest/take
 // ====================================
-const submitAnswers = async (req, res) => {
+const saveOrUpdateAnswers = async (req, res) => {
   try {
-    const { patientId } = req.params; // ✅ take from params
+    const { patientId } = req.params;
     const { answers } = req.body;
 
     if (!patientId) {
@@ -189,6 +229,7 @@ const submitAnswers = async (req, res) => {
       });
     }
 
+    // Get all matching questions
     const questionnaires = await BodyPartQuestionnaire.find({
       "questions._id": {
         $in: answers.map((a) => new mongoose.Types.ObjectId(a.questionId)),
@@ -215,15 +256,33 @@ const submitAnswers = async (req, res) => {
       }
     }
 
-    const saved = await PatientSelectedQuestions.create({
-      patientId,
-      answers: finalAnswers,
-    });
+    if (finalAnswers.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Invalid questionIds provided",
+      });
+    }
 
-    return res.status(201).json({
+    // Create if not exists, update if exists
+    const saved = await PatientSelectedQuestions.findOneAndUpdate(
+      { patientId },
+      {
+        $set: {
+          patientId,
+          answers: finalAnswers,
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      },
+    );
+
+    return res.status(200).json({
       status: "success",
       body: saved,
-      message: "Answers submitted successfully",
+      message: "Answers saved successfully",
     });
   } catch (error) {
     return res.status(500).json({
@@ -260,6 +319,7 @@ module.exports = {
   createQuestionnaire,
   updateQuestionnaire,
   getQuestionsByBodyParts,
-  submitAnswers,
+  submitAnswers: saveOrUpdateAnswers,
   getPatientAnswers,
+  getAllQuestions,
 };
