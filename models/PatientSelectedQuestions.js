@@ -1,43 +1,22 @@
+// ====================================
 // models/PatientSelectedQuestions.js
+// ====================================
 const mongoose = require("mongoose");
 
-const answerSchema = new mongoose.Schema({
-  questionId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-  },
-  question: {
+const answerSchema = new mongoose.Schema(
+  {
+    questionnaireId: mongoose.Schema.Types.ObjectId,
+
+    questionId: mongoose.Schema.Types.ObjectId,
+
+    question: String,
+
     type: String,
-    required: true,
+
+    answer: mongoose.Schema.Types.Mixed,
   },
-  answer: {
-    type: mongoose.Schema.Types.Mixed,
-    required: true,
-  },
-  type: {
-    type: String,
-    enum: ["text", "number", "mcq"],
-    default: "text",
-  },
-  score: {
-    type: Number,
-    default: 0,
-  },
-  category: {
-    type: String,
-    default: "",
-  },
-  mcqOptions: [
-    {
-      text: String,
-      isCorrect: Boolean,
-    },
-  ],
-  media: {
-    type: String,
-    default: "",
-  },
-});
+  { _id: false },
+);
 
 const patientSelectedQuestionsSchema = new mongoose.Schema(
   {
@@ -46,37 +25,13 @@ const patientSelectedQuestionsSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    selections: [
-      {
-        bodyPartId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Body",
-          required: true,
-        },
-        bodyPartName: {
-          type: String,
-          required: true,
-        },
-        questionnaireId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "BodyPartQuestionnaire",
-          required: true,
-        },
-        questionnaireTitle: {
-          type: String,
-          required: true,
-        },
-        selectedQuestions: [answerSchema],
-        selectedAt: {
-          type: Date,
-          default: Date.now,
-        },
-      },
-    ],
+
+    answers: {
+      type: [answerSchema],
+      default: [],
+    },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
 module.exports = mongoose.model(

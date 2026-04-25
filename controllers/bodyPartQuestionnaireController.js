@@ -1,107 +1,265 @@
-// controllers/bodyPartQuestionnaireController.js
+// ====================================
+// controllers/bodyQuestionnaire.js
+// ====================================
+const mongoose = require("mongoose");
 const BodyPartQuestionnaire = require("../models/BodyPartQuestionnaire");
+const PatientSelectedQuestions = require("../models/PatientSelectedQuestions");
 
-// Get all questionnaires (with optional bodyPart filter)
-const listQuestionnaires = async (req, res) => {
-  try {
-    const { bodyPart, isActive } = req.query;
-    const filter = {};
-
-    if (bodyPart) filter.bodyPart = bodyPart;
-    if (isActive) filter.isActive = isActive === "true";
-
-    const questionnaires = await BodyPartQuestionnaire.find(filter)
-      .populate("bodyPart", "partName description")
-      .sort({ createdAt: -1 });
-
-    res.json({ status: "success", body: questionnaires });
-  } catch (error) {
-    res.status(500).json({ status: "error", message: error.message });
-  }
-};
-
-// Get single questionnaire
-const getQuestionnaire = async (req, res) => {
-  try {
-    const questionnaire = await BodyPartQuestionnaire.findById(
-      req.params.id,
-    ).populate("bodyPart", "partName description");
-
-    if (!questionnaire) {
-      return res.status(404).json({ status: "error", message: "Not found" });
-    }
-
-    res.json({ status: "success", body: questionnaire });
-  } catch (error) {
-    res.status(500).json({ status: "error", message: error.message });
-  }
-};
-
-// Create questionnaire
+// ====================================
+// Create Questionnaire
+// POST /bodytest/create
+// ====================================
 const createQuestionnaire = async (req, res) => {
   try {
-    const { title, description, bodyPart, questions, isActive } = req.body;
+    const { title, description, bodyPart, bodyPartId, questions } = req.body;
 
-    const questionnaire = await BodyPartQuestionnaire.create({
-      title,
-      description,
-      bodyPart,
-      questions: questions || [],
-      isActive: isActive !== undefined ? isActive : true,
+    // support both bodyPart and bodyPartId
+    const finalBodyPart = bodyPart || bodyPartId;
+
+    // validations
+    if (!title?.trim()) {
+      return res.status(400).json({
+        status: "error",
+        message: "title is required",
+      });
+    }
+
+    if (!finalBodyPart) {
+      return res.status(400).json({
+        status: "error",
+        message: "bodyPart is required",
+      });
+    }
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "questions must be a non-empty array",
+      });
+    }
+
+    // validate questions
+    const formattedQuestions = questions.map((q, index) => {
+      if (!q.text?.trim()) {
+        throw new Error(`Question text required at index ${index}`);
+      }
+
+      const type = q.type || "text";
+
+      return {
+        text: q.text.trim(),
+        type,
+        required: q.required ?? true,
+        options:
+          type === "mcq-single" || type === "mcq-multiple"
+            ? (q.options || []).map((opt) => ({
+                label: opt.label,
+                value: opt.value,
+              }))
+            : [],
+      };
     });
 
-    await questionnaire.populate("bodyPart", "partName description");
+    const created = await BodyPartQuestionnaire.create({
+      title: title.trim(),
+      description: description?.trim() || "",
+      bodyPart: finalBodyPart,
+      questions: formattedQuestions,
+    });
 
-    res.status(201).json({ status: "success", body: questionnaire });
+    res.status(201).json({
+      status: "success",
+      body: created,
+      message: "Questionnaire created successfully",
+    });
   } catch (error) {
-    res.status(500).json({ status: "error", message: error.message });
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
   }
 };
 
-// Update questionnaire
+// ====================================
+// Update Questionnaire
+// PUT /bodytest/:id
+// ====================================
 const updateQuestionnaire = async (req, res) => {
   try {
-    const { title, description, bodyPart, questions, isActive } = req.body;
+    const updated = await BodyPartQuestionnaire.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true },
+    );
 
-    const questionnaire = await BodyPartQuestionnaire.findById(req.params.id);
-    if (!questionnaire) {
-      return res.status(404).json({ status: "error", message: "Not found" });
+    if (!updated) {
+      return res.status(404).json({
+        status: "error",
+        message: "Questionnaire not found",
+      });
     }
 
-    if (title !== undefined) questionnaire.title = title;
-    if (description !== undefined) questionnaire.description = description;
-    if (bodyPart !== undefined) questionnaire.bodyPart = bodyPart;
-    if (questions !== undefined) questionnaire.questions = questions;
-    if (isActive !== undefined) questionnaire.isActive = isActive;
-
-    await questionnaire.save();
-    await questionnaire.populate("bodyPart", "partName description");
-
-    res.json({ status: "success", body: questionnaire });
+    res.json({
+      status: "success",
+      body: updated,
+      message: "Updated successfully",
+    });
   } catch (error) {
-    res.status(500).json({ status: "error", message: error.message });
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
   }
 };
 
-// Delete questionnaire
-const deleteQuestionnaire = async (req, res) => {
+// ====================================
+// Get Questions By Body Parts
+// POST /bodytest/questions
+// body: { bodyPartIds: [] }
+// ====================================
+const getQuestionsByBodyParts = async (req, res) => {
   try {
-    const questionnaire = await BodyPartQuestionnaire.findById(req.params.id);
-    if (!questionnaire) {
-      return res.status(404).json({ status: "error", message: "Not found" });
+    const { bodyPartIds } = req.body;
+
+    if (!Array.isArray(bodyPartIds) || bodyPartIds.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "bodyPartIds must be non-empty array",
+      });
     }
 
-    await questionnaire.deleteOne();
-    res.json({ status: "success", message: "Deleted successfully" });
+    const data = await BodyPartQuestionnaire.find({
+      bodyPart: { $in: bodyPartIds },
+      isActive: true,
+    })
+      .populate("bodyPart", "name")
+      .lean();
+
+    const formatted = data.map((item) => ({
+      questionnaireId: item._id,
+      title: item.title,
+      description: item.description,
+      bodyPartId: item.bodyPart?._id || item.bodyPart,
+      bodyPartName: item.bodyPart?.name || "",
+      questions: item.questions.map((q) => ({
+        questionId: q._id,
+        text: q.text,
+        type: q.type,
+        required: q.required,
+        options: q.options || [],
+      })),
+    }));
+
+    res.json({
+      status: "success",
+      data: {
+        total: formatted.length,
+        questions: formatted,
+      },
+      message: "Questions retrieved successfully",
+    });
   } catch (error) {
-    res.status(500).json({ status: "error", message: error.message });
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+// ====================================
+// Submit Answers
+// POST /bodytest/take
+// ====================================
+const submitAnswers = async (req, res) => {
+  try {
+    const { patientId } = req.params; // ✅ take from params
+    const { answers } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({
+        status: "error",
+        message: "patientId required",
+      });
+    }
+
+    if (!Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "answers required",
+      });
+    }
+
+    const questionnaires = await BodyPartQuestionnaire.find({
+      "questions._id": {
+        $in: answers.map((a) => new mongoose.Types.ObjectId(a.questionId)),
+      },
+    }).lean();
+
+    const finalAnswers = [];
+
+    for (const item of answers) {
+      for (const form of questionnaires) {
+        const found = form.questions.find(
+          (q) => q._id.toString() === item.questionId,
+        );
+
+        if (found) {
+          finalAnswers.push({
+            questionnaireId: form._id,
+            questionId: found._id,
+            question: found.text,
+            type: found.type,
+            answer: item.answer,
+          });
+        }
+      }
+    }
+
+    const saved = await PatientSelectedQuestions.create({
+      patientId,
+      answers: finalAnswers,
+    });
+
+    return res.status(201).json({
+      status: "success",
+      body: saved,
+      message: "Answers submitted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+// ====================================
+// Get Patient Answers
+// GET /bodytest/patient/:patientId
+// ====================================
+const getPatientAnswers = async (req, res) => {
+  try {
+    const data = await PatientSelectedQuestions.find({
+      patientId: req.params.patientId,
+    }).sort({ createdAt: -1 });
+
+    res.json({
+      status: "success",
+      body: data,
+      message: "Patient answers fetched successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
   }
 };
 
 module.exports = {
-  listQuestionnaires,
-  getQuestionnaire,
   createQuestionnaire,
   updateQuestionnaire,
-  deleteQuestionnaire,
+  getQuestionsByBodyParts,
+  submitAnswers,
+  getPatientAnswers,
 };
