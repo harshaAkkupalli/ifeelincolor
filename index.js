@@ -59,7 +59,14 @@ io.on("connection", (socket) => {
   });
 });
 
-app.use(cors());
+// app.use(cors());
+
+app.use(
+  cors({
+    origin: "https://ifeelincolor.projexino.com",
+    credentials: true,
+  }),
+);
 
 app.use(bodyParser.json());
 app.use(passport.initialize());
