@@ -9,6 +9,7 @@ const {
   submitAnswers,
   getAllQuestions,
   saveOrUpdateFeelingAnswers,
+  getPatientConditionResult,
 } = require("../controllers/bodyPartQuestionnaireController");
 
 router.post("/body-part-questionnaires", getQuestionsByBodyParts);
@@ -16,6 +17,7 @@ router.post("/admin/body-part-questionnaires", createQuestionnaire);
 router.post("/submit-body-part-questionnaires/:patientId", submitAnswers);
 router.get("/admin/body-part-questionnaires", getAllQuestions);
 router.post("/submit-feeling-answers/:patientId", saveOrUpdateFeelingAnswers);
+router.get("/final-result/:patientId", getPatientConditionResult);
 
 router.put(
   "/admin/body-part-questionnaires/:id",

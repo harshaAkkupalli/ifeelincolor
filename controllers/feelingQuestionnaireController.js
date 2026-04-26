@@ -1,6 +1,9 @@
 // controllers/feelingQuestionnaireController.js
 const FeelingQuestionnaire = require("../models/FeelingQuestionnaire");
 
+const FeelingNode = require("../models/feelingsWheel");
+const FeelingFormMeta = require("../models/FeelingFormMeta");
+
 /**
  * GET /api/admin/feeling-questionnaire
  * List all feeling questionnaires with filters
@@ -364,6 +367,167 @@ const reorderQuestionnaires = async (req, res) => {
   }
 };
 
+// ==========================================
+// GET /api/feeling-questionnaire/questions/:id
+// Production Ready API
+// ==========================================
+
+const getFeelingQuestionsByQuestionnaireId = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Find questionnaire
+    const questionnaire = await FeelingQuestionnaire.findById(id)
+      .populate("bodyPart", "partName")
+      .lean();
+
+    if (!questionnaire) {
+      return res.status(404).json({
+        status: "error",
+        message: "Questionnaire not found",
+      });
+    }
+
+    // 2. Get question templates
+    const meta = await FeelingFormMeta.getSingleton();
+
+    // 3. Get all nodes
+    const nodes = await FeelingNode.find({ isActive: true }).lean();
+
+    const nodeMap = {};
+    const childrenMap = {};
+
+    nodes.forEach((node) => {
+      nodeMap[node.key] = node;
+
+      if (node.parentKey) {
+        if (!childrenMap[node.parentKey]) {
+          childrenMap[node.parentKey] = [];
+        }
+        childrenMap[node.parentKey].push(node);
+      }
+    });
+
+    // 4. Start node
+    const rootNode = nodeMap[questionnaire.feelingNodeKey];
+
+    if (!rootNode) {
+      return res.status(404).json({
+        status: "error",
+        message: "Starting feeling node not found",
+      });
+    }
+
+    const questions = [];
+
+    // ==========================================
+    // PRIMARY QUESTION
+    // ==========================================
+    if (
+      questionnaire.displayLevel === "full" ||
+      questionnaire.displayLevel === "primary"
+    ) {
+      questions.push({
+        questionId: rootNode.key,
+        level: "primary",
+        question:
+          questionnaire.customQuestion?.trim() ||
+          meta.primaryQuestion ||
+          "How are you feeling today?",
+        options: [
+          {
+            key: rootNode.key,
+            label: rootNode.label,
+            colorGroup: rootNode.colorGroup,
+            hexCode: rootNode.hexCode,
+          },
+        ],
+      });
+    }
+
+    // ==========================================
+    // SECONDARY QUESTION
+    // ==========================================
+    const secondaryNodes = childrenMap[rootNode.key] || [];
+
+    if (
+      secondaryNodes.length > 0 &&
+      (questionnaire.displayLevel === "full" ||
+        questionnaire.displayLevel === "secondary")
+    ) {
+      questions.push({
+        questionId: `${rootNode.key}_secondary`,
+        level: "secondary",
+        question: meta.secondaryQuestionTemplate.replace(
+          "{parent}",
+          rootNode.label.toLowerCase(),
+        ),
+        options: secondaryNodes.map((item) => ({
+          key: item.key,
+          label: item.label,
+          colorGroup: item.colorGroup,
+          hexCode: item.hexCode,
+        })),
+      });
+    }
+
+    // ==========================================
+    // TERTIARY QUESTIONS
+    // ==========================================
+    if (
+      questionnaire.displayLevel === "full" ||
+      questionnaire.displayLevel === "tertiary"
+    ) {
+      for (const secondary of secondaryNodes) {
+        const tertiaryNodes = childrenMap[secondary.key] || [];
+
+        if (tertiaryNodes.length > 0) {
+          questions.push({
+            questionId: `${secondary.key}_tertiary`,
+            level: "tertiary",
+            parentKey: secondary.key,
+            question: meta.tertiaryQuestionTemplate.replace(
+              "{parent}",
+              secondary.label.toLowerCase(),
+            ),
+            options: tertiaryNodes.map((item) => ({
+              key: item.key,
+              label: item.label,
+              colorGroup: item.colorGroup,
+              hexCode: item.hexCode,
+            })),
+          });
+        }
+      }
+    }
+
+    // ==========================================
+    // RESPONSE
+    // ==========================================
+    return res.status(200).json({
+      status: "success",
+      body: {
+        questionnaireId: questionnaire._id,
+        title: questionnaire.title,
+        description: questionnaire.description,
+        bodyPart: questionnaire.bodyPart || null,
+        feelingNodeKey: questionnaire.feelingNodeKey,
+        displayLevel: questionnaire.displayLevel,
+        totalQuestions: questions.length,
+        questions,
+      },
+      message: "Questions fetched successfully",
+    });
+  } catch (error) {
+    console.error("Error:", error);
+
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   listQuestionnaires,
   getQuestionnaire,
@@ -372,4 +536,5 @@ module.exports = {
   deleteQuestionnaire,
   toggleQuestionnaireStatus,
   reorderQuestionnaires,
+  getFeelingQuestionsByQuestionnaireId,
 };

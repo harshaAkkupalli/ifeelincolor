@@ -345,6 +345,7 @@ const getQuestionsByParts = async (req, res) => {
       const children = childrenMap[node.key] || [];
 
       return {
+        questionId: node._id,
         key: node.key,
         label: node.label,
         type: node.type,

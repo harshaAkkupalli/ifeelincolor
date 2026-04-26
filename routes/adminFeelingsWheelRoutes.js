@@ -20,6 +20,7 @@ const {
   deleteQuestionnaire,
   toggleQuestionnaireStatus,
   reorderQuestionnaires,
+  getFeelingQuestionsByQuestionnaireId,
 } = require("../controllers/feelingQuestionnaireController");
 
 // ============ PUBLIC ROUTES (No Auth) ============
@@ -57,6 +58,11 @@ router.post(
   "/admin/feeling-questionnaire/reorder",
   adminAuth,
   reorderQuestionnaires,
+);
+router.get(
+  "/admin/feeling-questionnaire/questions/:id",
+
+  getFeelingQuestionsByQuestionnaireId,
 );
 
 module.exports = router;

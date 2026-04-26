@@ -374,6 +374,122 @@ const saveOrUpdateFeelingAnswers = async (req, res) => {
     });
   }
 };
+
+const getPatientConditionResult = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    if (!patientId) {
+      return res.status(400).json({
+        status: "error",
+        message: "patientId required",
+      });
+    }
+
+    const [bodyData, feelingData] = await Promise.all([
+      PatientSelectedQuestions.findOne({ patientId }).lean(),
+      PatientFeelingAnswers.findOne({ patientId }).lean(),
+    ]);
+
+    const bodyAnswers = bodyData?.answers || [];
+    const feelingAnswers = feelingData?.answers || [];
+
+    // -------------------------
+    // Detect symptoms
+    // -------------------------
+    const yesSymptoms = bodyAnswers.filter((item) =>
+      ["yes", "true"].includes(String(item.answer).toLowerCase()),
+    );
+
+    const symptomCount = yesSymptoms.length;
+
+    // -------------------------
+    // Detect emotions
+    // -------------------------
+    const emotionLabels = feelingAnswers.map((item) => item.label);
+
+    const stressEmotions = [
+      "Angry",
+      "Depressed",
+      "Anxious",
+      "Scared",
+      "Frustrated",
+      "Worried",
+    ];
+
+    const hasStressEmotion = emotionLabels.some((e) =>
+      stressEmotions.includes(e),
+    );
+
+    // -------------------------
+    // Final Output Defaults
+    // -------------------------
+    let patientCondition = "Stable";
+    let severity = "Low";
+    let colorCode = "#22C55E";
+    let colorName = "Green";
+    let aboutCondition =
+      "Your current responses indicate a generally stable physical and emotional condition with no major concerns detected.";
+
+    // -------------------------
+    // Rules
+    // -------------------------
+    if (symptomCount >= 3) {
+      patientCondition = "Physical Discomfort";
+      severity = "Medium";
+      colorCode = "#F59E0B";
+      colorName = "Amber";
+      aboutCondition =
+        "Your answers suggest moderate physical discomfort. Some symptoms may need attention, rest, hydration, and monitoring.";
+    }
+
+    if (symptomCount >= 5) {
+      patientCondition = "Needs Medical Attention";
+      severity = "High";
+      colorCode = "#EF4444";
+      colorName = "Red";
+      aboutCondition =
+        "Multiple physical symptoms were detected. It is advisable to consult a healthcare professional for proper evaluation soon.";
+    }
+
+    if (hasStressEmotion) {
+      patientCondition = "Emotional Stress";
+      severity = "Medium";
+      colorCode = "#8B5CF6";
+      colorName = "Purple";
+      aboutCondition =
+        "Your emotional responses suggest noticeable stress. Relaxation, support, and healthy coping strategies may be helpful now.";
+    }
+
+    if (symptomCount >= 3 && hasStressEmotion) {
+      patientCondition = "High Stress with Physical Symptoms";
+      severity = "High";
+      colorCode = "#DC2626";
+      colorName = "Dark Red";
+      aboutCondition =
+        "Both emotional stress and physical symptoms are present. A balanced focus on mental and physical wellbeing is recommended.";
+    }
+
+    return res.status(200).json({
+      status: "success",
+      patientId,
+      result: {
+        patientCondition,
+        severity,
+        colorCode,
+        colorName,
+        aboutCondition,
+      },
+      message: "Patient condition generated successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   createQuestionnaire,
   updateQuestionnaire,
@@ -382,4 +498,5 @@ module.exports = {
   getPatientAnswers,
   getAllQuestions,
   saveOrUpdateFeelingAnswers,
+  getPatientConditionResult,
 };
