@@ -4,6 +4,7 @@
 const mongoose = require("mongoose");
 const BodyPartQuestionnaire = require("../models/BodyPartQuestionnaire");
 const PatientSelectedQuestions = require("../models/PatientSelectedQuestions");
+const PatientFeelingAnswers = require("../models/PatientFeelingAnswers");
 
 // ====================================
 // Create Questionnaire
@@ -315,6 +316,64 @@ const getPatientAnswers = async (req, res) => {
   }
 };
 
+const saveOrUpdateFeelingAnswers = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { selectedParts, bodyPartName, answers } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({
+        status: "error",
+        message: "patientId required",
+      });
+    }
+
+    if (!Array.isArray(answers) || answers.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "answers required",
+      });
+    }
+
+    const formattedAnswers = answers.map((item) => ({
+      key: item.key,
+      label: item.label,
+      type: item.type,
+      question: item.question,
+      answer: item.answer,
+      colorGroup: item.colorGroup || "",
+      hexCode: item.hexCode || {},
+    }));
+
+    const saved = await PatientFeelingAnswers.findOneAndUpdate(
+      { patientId },
+      {
+        $set: {
+          patientId,
+          selectedParts: selectedParts || [],
+          bodyPartName: bodyPartName || "",
+          answers: formattedAnswers,
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+      },
+    );
+
+    return res.status(200).json({
+      status: "success",
+      body: saved,
+      message: "Feeling answers saved successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
 module.exports = {
   createQuestionnaire,
   updateQuestionnaire,
@@ -322,4 +381,5 @@ module.exports = {
   submitAnswers: saveOrUpdateAnswers,
   getPatientAnswers,
   getAllQuestions,
+  saveOrUpdateFeelingAnswers,
 };
