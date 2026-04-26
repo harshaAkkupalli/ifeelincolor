@@ -426,8 +426,8 @@ const getPatientConditionResult = async (req, res) => {
     // -------------------------
     let patientCondition = "Stable";
     let severity = "Low";
-    let colorCode = "#22C55E";
-    let colorName = "Green";
+    let colorCode = "#000000"; // Black
+    let colorName = "Black";
     let aboutCondition =
       "Your current responses indicate a generally stable physical and emotional condition with no major concerns detected.";
 
@@ -446,7 +446,7 @@ const getPatientConditionResult = async (req, res) => {
     if (symptomCount >= 5) {
       patientCondition = "Needs Medical Attention";
       severity = "High";
-      colorCode = "#EF4444";
+      colorCode = "#ba2f24"; // Red
       colorName = "Red";
       aboutCondition =
         "Multiple physical symptoms were detected. It is advisable to consult a healthcare professional for proper evaluation soon.";
@@ -455,7 +455,7 @@ const getPatientConditionResult = async (req, res) => {
     if (hasStressEmotion) {
       patientCondition = "Emotional Stress";
       severity = "Medium";
-      colorCode = "#8B5CF6";
+      colorCode = "#961cca"; // Pink
       colorName = "Purple";
       aboutCondition =
         "Your emotional responses suggest noticeable stress. Relaxation, support, and healthy coping strategies may be helpful now.";
@@ -464,7 +464,7 @@ const getPatientConditionResult = async (req, res) => {
     if (symptomCount >= 3 && hasStressEmotion) {
       patientCondition = "High Stress with Physical Symptoms";
       severity = "High";
-      colorCode = "#DC2626";
+      colorCode = "#ba2f24"; // Red
       colorName = "Dark Red";
       aboutCondition =
         "Both emotional stress and physical symptoms are present. A balanced focus on mental and physical wellbeing is recommended.";
