@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const BodyPartQuestionnaire = require("../models/BodyPartQuestionnaire");
 const PatientSelectedQuestions = require("../models/PatientSelectedQuestions");
 const PatientFeelingAnswers = require("../models/PatientFeelingAnswers");
+const Patient = require("../models/patient");
 
 // ====================================
 // Create Questionnaire
@@ -375,6 +376,121 @@ const saveOrUpdateFeelingAnswers = async (req, res) => {
   }
 };
 
+// const getPatientConditionResult = async (req, res) => {
+//   try {
+//     const { patientId } = req.params;
+
+//     if (!patientId) {
+//       return res.status(400).json({
+//         status: "error",
+//         message: "patientId required",
+//       });
+//     }
+
+//     const [bodyData, feelingData] = await Promise.all([
+//       PatientSelectedQuestions.findOne({ patientId }).lean(),
+//       PatientFeelingAnswers.findOne({ patientId }).lean(),
+//     ]);
+
+//     const bodyAnswers = bodyData?.answers || [];
+//     const feelingAnswers = feelingData?.answers || [];
+
+//     // -------------------------
+//     // Detect symptoms
+//     // -------------------------
+//     const yesSymptoms = bodyAnswers.filter((item) =>
+//       ["yes", "true"].includes(String(item.answer).toLowerCase()),
+//     );
+
+//     const symptomCount = yesSymptoms.length;
+
+//     // -------------------------
+//     // Detect emotions
+//     // -------------------------
+//     const emotionLabels = feelingAnswers.map((item) => item.label);
+
+//     const stressEmotions = [
+//       "Angry",
+//       "Depressed",
+//       "Anxious",
+//       "Scared",
+//       "Frustrated",
+//       "Worried",
+//     ];
+
+//     const hasStressEmotion = emotionLabels.some((e) =>
+//       stressEmotions.includes(e),
+//     );
+
+//     // -------------------------
+//     // Final Output Defaults
+//     // -------------------------
+//     let patientCondition = "Stable";
+//     let severity = "Low";
+//     let colorCode = "#000000"; // Black
+//     let colorName = "Black";
+//     let aboutCondition =
+//       "Your current responses indicate a generally stable physical and emotional condition with no major concerns detected.";
+
+//     // -------------------------
+//     // Rules
+//     // -------------------------
+//     if (symptomCount >= 3) {
+//       patientCondition = "Physical Discomfort";
+//       severity = "Medium";
+//       colorCode = "#F59E0B";
+//       colorName = "Amber";
+//       aboutCondition =
+//         "Your answers suggest moderate physical discomfort. Some symptoms may need attention, rest, hydration, and monitoring.";
+//     }
+
+//     if (symptomCount >= 5) {
+//       patientCondition = "Needs Medical Attention";
+//       severity = "High";
+//       colorCode = "#ba2f24"; // Red
+//       colorName = "Red";
+//       aboutCondition =
+//         "Multiple physical symptoms were detected. It is advisable to consult a healthcare professional for proper evaluation soon.";
+//     }
+
+//     if (hasStressEmotion) {
+//       patientCondition = "Emotional Stress";
+//       severity = "Medium";
+//       colorCode = "#961cca"; // Pink
+//       colorName = "Purple";
+//       aboutCondition =
+//         "Your emotional responses suggest noticeable stress. Relaxation, support, and healthy coping strategies may be helpful now.";
+//     }
+
+//     if (symptomCount >= 3 && hasStressEmotion) {
+//       patientCondition = "High Stress with Physical Symptoms";
+//       severity = "High";
+//       colorCode = "#ba2f24"; // Red
+//       colorName = "Dark Red";
+//       aboutCondition =
+//         "Both emotional stress and physical symptoms are present. A balanced focus on mental and physical wellbeing is recommended.";
+//     }
+
+//     return res.status(200).json({
+//       status: "success",
+//       patientId,
+//       result: {
+//         patientCondition,
+//         severity,
+//         colorCode,
+//         colorName,
+//         aboutCondition,
+//       },
+//       message: "Patient condition generated successfully",
+//     });
+//   } catch (error) {
+//     return res.status(500).json({
+//       status: "error",
+//       message: error.message,
+//     });
+//   }
+// };
+
 const getPatientConditionResult = async (req, res) => {
   try {
     const { patientId } = req.params;
@@ -386,90 +502,112 @@ const getPatientConditionResult = async (req, res) => {
       });
     }
 
-    const [bodyData, feelingData] = await Promise.all([
+    // =========================================
+    // FETCH DATA
+    // =========================================
+    const [patient, bodyData, feelingData] = await Promise.all([
+      Patient.findById(patientId).lean(),
       PatientSelectedQuestions.findOne({ patientId }).lean(),
       PatientFeelingAnswers.findOne({ patientId }).lean(),
     ]);
 
+    if (!patient) {
+      return res.status(404).json({
+        status: "error",
+        message: "Patient not found",
+      });
+    }
+
+    const patientName = patient.userName || "Patient";
+
     const bodyAnswers = bodyData?.answers || [];
     const feelingAnswers = feelingData?.answers || [];
 
-    // -------------------------
-    // Detect symptoms
-    // -------------------------
+    // =========================================
+    // BODY PAIN / YES ANSWERS
+    // =========================================
     const yesSymptoms = bodyAnswers.filter((item) =>
       ["yes", "true"].includes(String(item.answer).toLowerCase()),
     );
 
-    const symptomCount = yesSymptoms.length;
+    const painPart =
+      feelingData?.bodyPartName ||
+      feelingData?.selectedParts?.[0]?.partName ||
+      "body";
 
-    // -------------------------
-    // Detect emotions
-    // -------------------------
-    const emotionLabels = feelingAnswers.map((item) => item.label);
+    // =========================================
+    // FEELINGS
+    // =========================================
+    const primaryFeeling =
+      feelingAnswers.find((x) => x.type === "primary") || null;
 
-    const stressEmotions = [
-      "Angry",
-      "Depressed",
-      "Anxious",
-      "Scared",
-      "Frustrated",
-      "Worried",
-    ];
+    const secondaryFeeling =
+      feelingAnswers.find((x) => x.type === "secondary") || null;
 
-    const hasStressEmotion = emotionLabels.some((e) =>
-      stressEmotions.includes(e),
-    );
+    const tertiaryFeeling =
+      feelingAnswers.find((x) => x.type === "tertiary") || null;
 
-    // -------------------------
-    // Final Output Defaults
-    // -------------------------
+    const feelingName =
+      tertiaryFeeling?.label ||
+      secondaryFeeling?.label ||
+      primaryFeeling?.label ||
+      "Unclear";
+
+    const topFeeling =
+      primaryFeeling?.label ||
+      secondaryFeeling?.label ||
+      tertiaryFeeling?.label ||
+      "Neutral";
+
+    // =========================================
+    // COLOR FROM FEELING
+    // =========================================
+    const colorCode =
+      tertiaryFeeling?.hexCode?.inner ||
+      secondaryFeeling?.hexCode?.inner ||
+      primaryFeeling?.hexCode?.inner ||
+      "#000000";
+
+    const colorMap = {
+      "#000000": "Black",
+      "#081844": "Blue",
+      "#ba2f24": "Red",
+      "#BA2F24": "Red",
+      "#961cca": "Purple",
+      "#961CCA": "Purple",
+      "#8c4622": "Brown",
+      "#8C4622": "Brown",
+      "#6f0fe3": "Indigo",
+      "#F59E0B": "Amber",
+      "#f59e0b": "Amber",
+    };
+
+    const colorName = colorMap[colorCode] || "Unknown";
+
+    // =========================================
+    // CONDITION
+    // =========================================
     let patientCondition = "Stable";
     let severity = "Low";
-    let colorCode = "#000000"; // Black
-    let colorName = "Black";
-    let aboutCondition =
-      "Your current responses indicate a generally stable physical and emotional condition with no major concerns detected.";
 
-    // -------------------------
-    // Rules
-    // -------------------------
-    if (symptomCount >= 3) {
+    if (yesSymptoms.length >= 3) {
       patientCondition = "Physical Discomfort";
       severity = "Medium";
-      colorCode = "#F59E0B";
-      colorName = "Amber";
-      aboutCondition =
-        "Your answers suggest moderate physical discomfort. Some symptoms may need attention, rest, hydration, and monitoring.";
     }
 
-    if (symptomCount >= 5) {
+    if (yesSymptoms.length >= 5) {
       patientCondition = "Needs Medical Attention";
       severity = "High";
-      colorCode = "#ba2f24"; // Red
-      colorName = "Red";
-      aboutCondition =
-        "Multiple physical symptoms were detected. It is advisable to consult a healthcare professional for proper evaluation soon.";
     }
 
-    if (hasStressEmotion) {
-      patientCondition = "Emotional Stress";
-      severity = "Medium";
-      colorCode = "#961cca"; // Pink
-      colorName = "Purple";
-      aboutCondition =
-        "Your emotional responses suggest noticeable stress. Relaxation, support, and healthy coping strategies may be helpful now.";
-    }
+    // =========================================
+    // MESSAGE
+    // =========================================
+    const aboutCondition = `Hey ${patientName}, you are feeling pain in your ${painPart} because you feel ${feelingName}, which indicates you are ${topFeeling}.`;
 
-    if (symptomCount >= 3 && hasStressEmotion) {
-      patientCondition = "High Stress with Physical Symptoms";
-      severity = "High";
-      colorCode = "#ba2f24"; // Red
-      colorName = "Dark Red";
-      aboutCondition =
-        "Both emotional stress and physical symptoms are present. A balanced focus on mental and physical wellbeing is recommended.";
-    }
-
+    // =========================================
+    // RESPONSE
+    // =========================================
     return res.status(200).json({
       status: "success",
       patientId,
@@ -478,6 +616,9 @@ const getPatientConditionResult = async (req, res) => {
         severity,
         colorCode,
         colorName,
+        bodyPartName: painPart,
+        feelingName,
+        topFeeling,
         aboutCondition,
       },
       message: "Patient condition generated successfully",
