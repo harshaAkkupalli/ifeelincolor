@@ -2,6 +2,9 @@ const BodyAssessment = require("../models/BodyAssessment");
 const Color = require("../models/Color");
 const FeelingNode = require("../models/feelingsWheel");
 const FeelingFormMeta = require("../models/FeelingFormMeta");
+const PatientSelectedQuestions = require("../models/PatientSelectedQuestions");
+const PatientFeelingAnswers = require("../models/PatientFeelingAnswers");
+const Patient = require("../models/patient");
 
 // Create a body assessment
 const createBodyAssessment = async (req, res) => {
@@ -788,6 +791,62 @@ const takeBodyAssessment = async (req, res) => {
     });
   }
 };
+const getPatientAnswersByPatientId = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    // ===============================
+    // VALIDATION
+    // ===============================
+    if (!patientId) {
+      return res.status(400).json({
+        status: "error",
+        message: "patientId is required",
+      });
+    }
+
+    // ===============================
+    // FETCH BOTH DATA
+    // ===============================
+    const [bodyAnswers, feelingAnswers, patient] = await Promise.all([
+      PatientSelectedQuestions.findOne({ patientId }).lean(),
+      PatientFeelingAnswers.findOne({ patientId }).lean(),
+      Patient.findById(patientId).lean(),
+    ]);
+
+    // ===============================
+    // RESPONSE
+    // ===============================
+    return res.status(200).json({
+      status: "success",
+      body: {
+        patient: {
+          patientId,
+          name: patient?.userName || "",
+          email: patient?.email || "",
+          mobile: patient?.mobile || "",
+        },
+
+        bodyQuestions: bodyAnswers?.answers || [],
+
+        feelingQuestions: feelingAnswers?.answers || [],
+
+        bodyPartName:
+          feelingAnswers?.bodyPartName ||
+          feelingAnswers?.selectedParts?.[0]?.partName ||
+          "",
+
+        selectedParts: feelingAnswers?.selectedParts || [],
+      },
+      message: "Patient answers fetched successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
 
 module.exports = {
   createBodyAssessment,
@@ -799,4 +858,5 @@ module.exports = {
   takeBodyAssessment,
   getQuestionsByPart,
   getQuestionsByParts,
+  getPatientAnswersByPatientId,
 };
