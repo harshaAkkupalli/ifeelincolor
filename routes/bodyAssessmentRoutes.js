@@ -10,6 +10,7 @@ const {
   takeBodyAssessment,
   getQuestionsByPart,
   getQuestionsByParts,
+  getPatientAnswersByPatientId,
 } = require("../controllers/BodyAssessmentController");
 router.post("/bodytest", createBodyAssessment);
 router.get("/bodytest", getAllBodyAssessments);
@@ -20,5 +21,6 @@ router.get("/bodytest/category/:categoryId", getBodyAssessmentsByCategory);
 router.post("/bodytest/take", takeBodyAssessment);
 router.get("/questions/:partId", getQuestionsByPart);
 router.post("/questions-by-parts", getQuestionsByParts);
+router.get("/getpatient-answers/:patientId", getPatientAnswersByPatientId);
 
 module.exports = router;
