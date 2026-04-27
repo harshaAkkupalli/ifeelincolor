@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const BodyPartQuestionnaire = require("../models/BodyPartQuestionnaire");
 const PatientSelectedQuestions = require("../models/PatientSelectedQuestions");
 const PatientFeelingAnswers = require("../models/PatientFeelingAnswers");
+const FeelingNode = require("../models/feelingsWheel");
 const Patient = require("../models/patient");
 
 // ====================================
@@ -491,6 +492,146 @@ const saveOrUpdateFeelingAnswers = async (req, res) => {
 //   }
 // };
 
+// const getPatientConditionResult = async (req, res) => {
+//   try {
+//     const { patientId } = req.params;
+
+//     if (!patientId) {
+//       return res.status(400).json({
+//         status: "error",
+//         message: "patientId required",
+//       });
+//     }
+
+//     // =========================================
+//     // FETCH DATA
+//     // =========================================
+//     const [patient, bodyData, feelingData] = await Promise.all([
+//       Patient.findById(patientId).lean(),
+//       PatientSelectedQuestions.findOne({ patientId }).lean(),
+//       PatientFeelingAnswers.findOne({ patientId }).lean(),
+//     ]);
+
+//     if (!patient) {
+//       return res.status(404).json({
+//         status: "error",
+//         message: "Patient not found",
+//       });
+//     }
+
+//     const patientName = patient.userName || "Patient";
+
+//     const bodyAnswers = bodyData?.answers || [];
+//     const feelingAnswers = feelingData?.answers || [];
+
+//     // =========================================
+//     // BODY PAIN / YES ANSWERS
+//     // =========================================
+//     const yesSymptoms = bodyAnswers.filter((item) =>
+//       ["yes", "true"].includes(String(item.answer).toLowerCase()),
+//     );
+
+//     const painPart =
+//       feelingData?.bodyPartName ||
+//       feelingData?.selectedParts?.[0]?.partName ||
+//       "body";
+
+//     // =========================================
+//     // FEELINGS
+//     // =========================================
+//     const primaryFeeling =
+//       feelingAnswers.find((x) => x.type === "primary") || null;
+
+//     const secondaryFeeling =
+//       feelingAnswers.find((x) => x.type === "secondary") || null;
+
+//     const tertiaryFeeling =
+//       feelingAnswers.find((x) => x.type === "tertiary") || null;
+
+//     const feelingName =
+//       tertiaryFeeling?.label ||
+//       secondaryFeeling?.label ||
+//       primaryFeeling?.label ||
+//       "Unclear";
+
+//     const topFeeling =
+//       primaryFeeling?.label ||
+//       secondaryFeeling?.label ||
+//       tertiaryFeeling?.label ||
+//       "Neutral";
+
+//     // =========================================
+//     // COLOR FROM FEELING
+//     // =========================================
+//     const colorCode =
+//       tertiaryFeeling?.hexCode?.inner ||
+//       secondaryFeeling?.hexCode?.inner ||
+//       primaryFeeling?.hexCode?.inner ||
+//       "#000000";
+
+//     const colorMap = {
+//       "#000000": "Black",
+//       "#081844": "Blue",
+//       "#ba2f24": "Red",
+//       "#BA2F24": "Red",
+//       "#961cca": "Purple",
+//       "#961CCA": "Purple",
+//       "#8c4622": "Brown",
+//       "#8C4622": "Brown",
+//       "#6f0fe3": "Indigo",
+//       "#F59E0B": "Amber",
+//       "#f59e0b": "Amber",
+//     };
+
+//     const colorName = colorMap[colorCode] || "Unknown";
+
+//     // =========================================
+//     // CONDITION
+//     // =========================================
+//     let patientCondition = "Stable";
+//     let severity = "Low";
+
+//     if (yesSymptoms.length >= 3) {
+//       patientCondition = "Physical Discomfort";
+//       severity = "Medium";
+//     }
+
+//     if (yesSymptoms.length >= 5) {
+//       patientCondition = "Needs Medical Attention";
+//       severity = "High";
+//     }
+
+//     // =========================================
+//     // MESSAGE
+//     // =========================================
+//     const aboutCondition = `Hey ${patientName}, you are feeling pain in your ${painPart} because you feel ${feelingName}, which indicates you are ${topFeeling}.`;
+
+//     // =========================================
+//     // RESPONSE
+//     // =========================================
+//     return res.status(200).json({
+//       status: "success",
+//       patientId,
+//       result: {
+//         patientCondition,
+//         severity,
+//         colorCode,
+//         colorName,
+//         bodyPartName: painPart,
+//         feelingName,
+//         topFeeling,
+//         aboutCondition,
+//       },
+//       message: "Patient condition generated successfully",
+//     });
+//   } catch (error) {
+//     return res.status(500).json({
+//       status: "error",
+//       message: error.message,
+//     });
+//   }
+// };
+
 const getPatientConditionResult = async (req, res) => {
   try {
     const { patientId } = req.params;
@@ -502,9 +643,9 @@ const getPatientConditionResult = async (req, res) => {
       });
     }
 
-    // =========================================
+    // =====================================
     // FETCH DATA
-    // =========================================
+    // =====================================
     const [patient, bodyData, feelingData] = await Promise.all([
       Patient.findById(patientId).lean(),
       PatientSelectedQuestions.findOne({ patientId }).lean(),
@@ -518,107 +659,81 @@ const getPatientConditionResult = async (req, res) => {
       });
     }
 
+    // =====================================
+    // PATIENT NAME
+    // =====================================
     const patientName = patient.userName || "Patient";
 
-    const bodyAnswers = bodyData?.answers || [];
-    const feelingAnswers = feelingData?.answers || [];
-
-    // =========================================
-    // BODY PAIN / YES ANSWERS
-    // =========================================
-    const yesSymptoms = bodyAnswers.filter((item) =>
-      ["yes", "true"].includes(String(item.answer).toLowerCase()),
-    );
-
-    const painPart =
+    // =====================================
+    // BODY PART
+    // =====================================
+    const bodyPartName =
       feelingData?.bodyPartName ||
       feelingData?.selectedParts?.[0]?.partName ||
       "body";
 
-    // =========================================
-    // FEELINGS
-    // =========================================
-    const primaryFeeling =
-      feelingAnswers.find((x) => x.type === "primary") || null;
+    // =====================================
+    // PAIN COUNT
+    // =====================================
+    const painCount =
+      bodyData?.answers?.filter((x) =>
+        ["yes", "true"].includes(String(x.answer).toLowerCase()),
+      ).length || 0;
 
-    const secondaryFeeling =
-      feelingAnswers.find((x) => x.type === "secondary") || null;
+    // =====================================
+    // PRIMARY FEELING
+    // =====================================
+    const primaryFeeling = feelingData?.answers?.[0]?.answer || "Neutral";
 
-    const tertiaryFeeling =
-      feelingAnswers.find((x) => x.type === "tertiary") || null;
-
-    const feelingName =
-      tertiaryFeeling?.label ||
-      secondaryFeeling?.label ||
-      primaryFeeling?.label ||
-      "Unclear";
-
-    const topFeeling =
-      primaryFeeling?.label ||
-      secondaryFeeling?.label ||
-      tertiaryFeeling?.label ||
-      "Neutral";
-
-    // =========================================
-    // COLOR FROM FEELING
-    // =========================================
-    const colorCode =
-      tertiaryFeeling?.hexCode?.inner ||
-      secondaryFeeling?.hexCode?.inner ||
-      primaryFeeling?.hexCode?.inner ||
-      "#000000";
-
-    const colorMap = {
-      "#000000": "Black",
-      "#081844": "Blue",
-      "#ba2f24": "Red",
-      "#BA2F24": "Red",
-      "#961cca": "Purple",
-      "#961CCA": "Purple",
-      "#8c4622": "Brown",
-      "#8C4622": "Brown",
-      "#6f0fe3": "Indigo",
-      "#F59E0B": "Amber",
-      "#f59e0b": "Amber",
+    // =====================================
+    // FIXED COLOR MAP
+    // =====================================
+    const feelingColors = {
+      Happy: "#FFD700",
+      Sad: "#1E90FF",
+      Disgusted: "#808080",
+      Angry: "#FF0000",
+      Fearful: "#FF8C00",
+      Bad: "#00A36C",
+      Surprised: "#8A2BE2",
     };
 
-    const colorName = colorMap[colorCode] || "Unknown";
+    const colorCode = feelingColors[primaryFeeling] || "#000000";
 
-    // =========================================
+    // =====================================
     // CONDITION
-    // =========================================
+    // =====================================
     let patientCondition = "Stable";
     let severity = "Low";
 
-    if (yesSymptoms.length >= 3) {
-      patientCondition = "Physical Discomfort";
+    if (painCount >= 3) {
+      patientCondition = "Pain Detected";
       severity = "Medium";
     }
 
-    if (yesSymptoms.length >= 5) {
-      patientCondition = "Needs Medical Attention";
+    if (painCount >= 5) {
+      patientCondition = "High Pain";
       severity = "High";
     }
 
-    // =========================================
+    // =====================================
     // MESSAGE
-    // =========================================
-    const aboutCondition = `Hey ${patientName}, you are feeling pain in your ${painPart} because you feel ${feelingName}, which indicates you are ${topFeeling}.`;
+    // =====================================
+    const aboutCondition = `Hey ${patientName}, you are feeling pain in your ${bodyPartName} because you feel ${primaryFeeling}.`;
 
-    // =========================================
+    // =====================================
     // RESPONSE
-    // =========================================
+    // =====================================
     return res.status(200).json({
       status: "success",
       patientId,
       result: {
+        patientName,
+        bodyPartName,
+        topFeeling: primaryFeeling,
+        colorCode,
         patientCondition,
         severity,
-        colorCode,
-        colorName,
-        bodyPartName: painPart,
-        feelingName,
-        topFeeling,
         aboutCondition,
       },
       message: "Patient condition generated successfully",
