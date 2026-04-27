@@ -267,22 +267,137 @@ const getQuestionsByPart = async (req, res) => {
 //     }
 // };
 
+// const getQuestionsByParts = async (req, res) => {
+//   try {
+//     const { partIds, bodyPartName } = req.body;
+
+//     // 1. Validate input
+//     if (!Array.isArray(partIds) || partIds.length === 0) {
+//       return res.status(400).json({
+//         status: "error",
+//         message: "partIds must be a non-empty array",
+//       });
+//     }
+
+//     // 2. Get meta (question templates)
+//     const meta = await FeelingFormMeta.getSingleton();
+
+//     // 3. Fetch all nodes
+//     const nodes = await FeelingNode.find({ isActive: true })
+//       .sort({ order: 1 })
+//       .lean();
+
+//     if (!nodes.length) {
+//       return res.status(404).json({
+//         status: "error",
+//         message: "No nodes found",
+//       });
+//     }
+
+//     // 4. Create lookup maps
+//     const nodeMap = {};
+//     const childrenMap = {};
+
+//     nodes.forEach((node) => {
+//       nodeMap[node.key] = node;
+
+//       if (node.parentKey) {
+//         if (!childrenMap[node.parentKey]) {
+//           childrenMap[node.parentKey] = [];
+//         }
+//         childrenMap[node.parentKey].push(node);
+//       }
+//     });
+
+//     // 5. Recursive builder
+//     const buildTree = (
+//       node,
+//       parentColor = null,
+//       parentHex = null,
+//       bodyPartName,
+//     ) => {
+//       // ✅ inherit color
+//       const color = node.colorGroup || parentColor;
+//       const hex = node.hexCode?.inner ? node.hexCode : parentHex;
+//       // ✅ get parent label properly
+//       const parentNode = node.parentKey ? nodeMap[node.parentKey] : null;
+
+//       const parentLabel = parentNode ? parentNode.label : "";
+
+//       // ✅ build question
+//       let question = meta.primaryQuestion;
+
+//       if (node.type === "secondary") {
+//         question = meta.secondaryQuestionTemplate.replace(
+//           "{parent}",
+//           parentLabel.toLowerCase(),
+//         );
+//       }
+
+//       if (node.type === "tertiary") {
+//         question = meta.tertiaryQuestionTemplate.replace(
+//           "{parent}",
+//           parentLabel.toLowerCase(),
+//         );
+//       }
+
+//       // ✅ get children
+//       const children = childrenMap[node.key] || [];
+
+//       return {
+//         questionId: node._id,
+//         key: node.key,
+//         label: node.label,
+//         type: node.type,
+//         bodyPartName,
+//         colorGroup: color,
+//         hexCode: node.hexCode || {},
+//         question,
+//         options: children.map((child) => buildTree(child, color)),
+//       };
+//     };
+
+//     // 6. Build response
+//     const result = partIds
+//       .map((id) => {
+//         const node = nodeMap[id];
+//         if (!node) return null;
+//         return buildTree(node, null, null, bodyPartName); // ✅ pass here
+//       })
+//       .filter(Boolean);
+
+//     // 7. Response
+//     return res.status(200).json({
+//       status: "success",
+//       count: result.length,
+//       body: result,
+//     });
+//   } catch (error) {
+//     console.error("Error in getQuestionsByParts:", error);
+
+//     return res.status(500).json({
+//       status: "error",
+//       message: error.message,
+//     });
+//   }
+// };
+
 const getQuestionsByParts = async (req, res) => {
   try {
-    const { partIds, bodyPartName } = req.body;
+    const { partId, bodyPartName } = req.body;
 
-    // 1. Validate input
-    if (!Array.isArray(partIds) || partIds.length === 0) {
+    // 1. Validate input (single key only)
+    if (!partId) {
       return res.status(400).json({
         status: "error",
-        message: "partIds must be a non-empty array",
+        message: "partId is required",
       });
     }
 
-    // 2. Get meta (question templates)
+    // 2. Get meta questions
     const meta = await FeelingFormMeta.getSingleton();
 
-    // 3. Fetch all nodes
+    // 3. Fetch active nodes
     const nodes = await FeelingNode.find({ isActive: true })
       .sort({ order: 1 })
       .lean();
@@ -294,7 +409,7 @@ const getQuestionsByParts = async (req, res) => {
       });
     }
 
-    // 4. Create lookup maps
+    // 4. Create maps
     const nodeMap = {};
     const childrenMap = {};
 
@@ -305,26 +420,37 @@ const getQuestionsByParts = async (req, res) => {
         if (!childrenMap[node.parentKey]) {
           childrenMap[node.parentKey] = [];
         }
+
         childrenMap[node.parentKey].push(node);
       }
     });
 
-    // 5. Recursive builder
+    // 5. Find selected node
+    const selectedNode = nodeMap[partId];
+
+    if (!selectedNode) {
+      return res.status(404).json({
+        status: "error",
+        message: `Node '${partId}' not found`,
+      });
+    }
+
+    // 6. Recursive tree builder
     const buildTree = (
       node,
       parentColor = null,
       parentHex = null,
       bodyPartName,
     ) => {
-      // ✅ inherit color
       const color = node.colorGroup || parentColor;
-      const hex = node.hexCode?.inner ? node.hexCode : parentHex;
-      // ✅ get parent label properly
-      const parentNode = node.parentKey ? nodeMap[node.parentKey] : null;
+      const hex =
+        node.hexCode?.inner || node.hexCode?.middle || node.hexCode?.outer
+          ? node.hexCode
+          : parentHex;
 
+      const parentNode = node.parentKey ? nodeMap[node.parentKey] : null;
       const parentLabel = parentNode ? parentNode.label : "";
 
-      // ✅ build question
       let question = meta.primaryQuestion;
 
       if (node.type === "secondary") {
@@ -341,7 +467,6 @@ const getQuestionsByParts = async (req, res) => {
         );
       }
 
-      // ✅ get children
       const children = childrenMap[node.key] || [];
 
       return {
@@ -351,25 +476,20 @@ const getQuestionsByParts = async (req, res) => {
         type: node.type,
         bodyPartName,
         colorGroup: color,
-        hexCode: node.hexCode || {},
+        hexCode: hex,
         question,
-        options: children.map((child) => buildTree(child, color)),
+        options: children.map((child) =>
+          buildTree(child, color, hex, bodyPartName),
+        ),
       };
     };
 
-    // 6. Build response
-    const result = partIds
-      .map((id) => {
-        const node = nodeMap[id];
-        if (!node) return null;
-        return buildTree(node, null, null, bodyPartName); // ✅ pass here
-      })
-      .filter(Boolean);
+    // 7. Build single result
+    const result = buildTree(selectedNode, null, null, bodyPartName);
 
-    // 7. Response
+    // 8. Response
     return res.status(200).json({
       status: "success",
-      count: result.length,
       body: result,
     });
   } catch (error) {
