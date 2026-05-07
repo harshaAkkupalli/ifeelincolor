@@ -32,6 +32,7 @@ const announcementRoutes = require("./routes/announcementRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const bodyPartQuestionnaireRoutes = require("./routes/bodyPartQuestionnaireRoutes");
 const bodyPartRoutes = require("./routes/bodyPartRoutes");
+const patientHistoryRoutes = require("./routes/patientHistoryRoutes");
 
 const adminFeelingsWheelRoutes = require("./routes/adminFeelingsWheelRoutes");
 dotenv.config();
@@ -93,6 +94,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/feelings-wheel", adminFeelingsWheelRoutes);
 app.use("/api", bodyPartQuestionnaireRoutes);
 app.use("/api", bodyPartRoutes);
+app.use("/api/patient-history", patientHistoryRoutes);
 
 app.set("view engine", "ejs");
 app.set("views", "./views");
