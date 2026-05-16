@@ -3,7 +3,6 @@ const AssistantPermission = require("../models/assistantPermission");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { uploadFile, deleteFile, getFileUrl } = require("../utils/s3Util");
-const assistantWelcomeTemplate = require("../utils/emailTemplates/assistantWelcomeTemplate");
 
 // Register Assistant
 const registerAssistant = async (req, res) => {
