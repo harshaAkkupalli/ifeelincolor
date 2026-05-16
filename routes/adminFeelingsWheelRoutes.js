@@ -6,6 +6,7 @@ const {
   getFeelingsWheel,
   listNodes,
   createNode,
+  createManyNodes,
   updateNode,
   deleteNode,
   getMeta,
@@ -31,6 +32,7 @@ router.get("/", getFeelingsWheel);
 router.get("/admin/feelings-wheel/nodes", adminAuth, listNodes);
 router.post("/admin/feelings-wheel/nodes", adminAuth, createNode);
 router.put("/admin/feelings-wheel/nodes/:id", adminAuth, updateNode);
+router.post("/admin/feelings-wheel/nodes/batch", createManyNodes);
 router.delete("/admin/feelings-wheel/nodes/:id", adminAuth, deleteNode);
 
 // Meta management

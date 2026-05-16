@@ -355,6 +355,47 @@ const createNode = async (req, res) => {
   }
 };
 
+const createManyNodes = async (req, res) => {
+  try {
+    const { nodes } = req.body;
+
+    if (!Array.isArray(nodes) || nodes.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "nodes array required",
+      });
+    }
+
+    const formattedNodes = nodes.map((item) => ({
+      key: item.key.toLowerCase().trim(),
+      label: item.label.trim(),
+      type: item.type,
+      parentKey: item.parentKey || null,
+      colorGroup: item.type === "primary" ? item.colorGroup : null,
+      hexCode:
+        item.type === "primary"
+          ? item.hexCode
+          : { inner: null, middle: null, outer: null },
+      order: item.order || 0,
+      isActive: true,
+    }));
+
+    const saved = await FeelingNode.insertMany(formattedNodes);
+
+    return res.status(201).json({
+      status: "success",
+      count: saved.length,
+      body: saved,
+      message: "Nodes inserted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
 /**
  * PUT /api/admin/feelings-wheel/nodes/:id
  * Update node by MongoDB _id
@@ -717,4 +758,5 @@ module.exports = {
   getMeta,
   updateMeta,
   previewForm,
+  createManyNodes,
 };

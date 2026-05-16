@@ -385,140 +385,24 @@ const getQuestionsByPart = async (req, res) => {
 //   }
 // };
 
-const getQuestionsByParts = async (req, res) => {
-  try {
-    const { partId, bodyPartName } = req.body;
-
-    // 1. Validate input (single key only)
-    if (!partId) {
-      return res.status(400).json({
-        status: "error",
-        message: "partId is required",
-      });
-    }
-
-    // 2. Get meta questions
-    const meta = await FeelingFormMeta.getSingleton();
-
-    // 3. Fetch active nodes
-    const nodes = await FeelingNode.find({ isActive: true })
-      .sort({ order: 1 })
-      .lean();
-
-    if (!nodes.length) {
-      return res.status(404).json({
-        status: "error",
-        message: "No nodes found",
-      });
-    }
-
-    // 4. Create maps
-    const nodeMap = {};
-    const childrenMap = {};
-
-    nodes.forEach((node) => {
-      nodeMap[node.key] = node;
-
-      if (node.parentKey) {
-        if (!childrenMap[node.parentKey]) {
-          childrenMap[node.parentKey] = [];
-        }
-
-        childrenMap[node.parentKey].push(node);
-      }
-    });
-
-    // 5. Find selected node
-    const selectedNode = nodeMap[partId];
-
-    if (!selectedNode) {
-      return res.status(404).json({
-        status: "error",
-        message: `Node '${partId}' not found`,
-      });
-    }
-
-    // 6. Recursive tree builder
-    const buildTree = (
-      node,
-      parentColor = null,
-      parentHex = null,
-      bodyPartName,
-    ) => {
-      const color = node.colorGroup || parentColor;
-      const hex =
-        node.hexCode?.inner || node.hexCode?.middle || node.hexCode?.outer
-          ? node.hexCode
-          : parentHex;
-
-      const parentNode = node.parentKey ? nodeMap[node.parentKey] : null;
-      const parentLabel = parentNode ? parentNode.label : "";
-
-      let question = meta.primaryQuestion;
-
-      if (node.type === "secondary") {
-        question = meta.secondaryQuestionTemplate.replace(
-          "{parent}",
-          parentLabel.toLowerCase(),
-        );
-      }
-
-      if (node.type === "tertiary") {
-        question = meta.tertiaryQuestionTemplate.replace(
-          "{parent}",
-          parentLabel.toLowerCase(),
-        );
-      }
-
-      const children = childrenMap[node.key] || [];
-
-      return {
-        questionId: node._id,
-        key: node.key,
-        label: node.label,
-        type: node.type,
-        bodyPartName,
-        colorGroup: color,
-        hexCode: hex,
-        question,
-        options: children.map((child) =>
-          buildTree(child, color, hex, bodyPartName),
-        ),
-      };
-    };
-
-    // 7. Build single result
-    const result = buildTree(selectedNode, null, null, bodyPartName);
-
-    // 8. Response
-    return res.status(200).json({
-      status: "success",
-      body: result,
-    });
-  } catch (error) {
-    console.error("Error in getQuestionsByParts:", error);
-
-    return res.status(500).json({
-      status: "error",
-      message: error.message,
-    });
-  }
-};
-
 // const getQuestionsByParts = async (req, res) => {
 //   try {
-//     const { partId = null, bodyPartName = "" } = req.body;
+//     const { partId, bodyPartName } = req.body;
 
-//     // ==========================================
-//     // 1. GET META
-//     // ==========================================
+//     // 1. Validate input (single key only)
+//     if (!partId) {
+//       return res.status(400).json({
+//         status: "error",
+//         message: "partId is required",
+//       });
+//     }
+
+//     // 2. Get meta questions
 //     const meta = await FeelingFormMeta.getSingleton();
 
-//     // ==========================================
-//     // 2. FETCH ALL ACTIVE NODES
-//     // ==========================================
+//     // 3. Fetch active nodes
 //     const nodes = await FeelingNode.find({ isActive: true })
-//       .sort({ order: 1, label: 1 })
+//       .sort({ order: 1 })
 //       .lean();
 
 //     if (!nodes.length) {
@@ -528,46 +412,23 @@ const getQuestionsByParts = async (req, res) => {
 //       });
 //     }
 
-//     // ==========================================
-//     // 3. CREATE MAPS
-//     // ==========================================
+//     // 4. Create maps
 //     const nodeMap = {};
 //     const childrenMap = {};
 
 //     nodes.forEach((node) => {
 //       nodeMap[node.key] = node;
 
-//       if (!childrenMap[node.parentKey]) {
-//         childrenMap[node.parentKey] = [];
-//       }
+//       if (node.parentKey) {
+//         if (!childrenMap[node.parentKey]) {
+//           childrenMap[node.parentKey] = [];
+//         }
 
-//       childrenMap[node.parentKey].push(node);
+//         childrenMap[node.parentKey].push(node);
+//       }
 //     });
 
-//     // ==========================================
-//     // 4. FIRST LOAD => RETURN PRIMARY FEELINGS
-//     // ==========================================
-//     if (!partId) {
-//       const primaryNodes = childrenMap[null] || [];
-
-//       return res.status(200).json({
-//         status: "success",
-//         step: "primary",
-//         question: meta.primaryQuestion,
-//         body: primaryNodes.map((node) => ({
-//           questionId: node._id,
-//           key: node.key,
-//           label: node.label,
-//           type: node.type,
-//           colorGroup: node.colorGroup,
-//           hexCode: node.hexCode,
-//         })),
-//       });
-//     }
-
-//     // ==========================================
-//     // 5. SELECTED NODE CHECK
-//     // ==========================================
+//     // 5. Find selected node
 //     const selectedNode = nodeMap[partId];
 
 //     if (!selectedNode) {
@@ -577,69 +438,62 @@ const getQuestionsByParts = async (req, res) => {
 //       });
 //     }
 
-//     // ==========================================
-//     // 6. CHILDREN OF SELECTED NODE
-//     // ==========================================
-//     const childNodes = childrenMap[selectedNode.key] || [];
+//     // 6. Recursive tree builder
+//     const buildTree = (
+//       node,
+//       parentColor = null,
+//       parentHex = null,
+//       bodyPartName,
+//     ) => {
+//       const color = node.colorGroup || parentColor;
+//       const hex =
+//         node.hexCode?.inner || node.hexCode?.middle || node.hexCode?.outer
+//           ? node.hexCode
+//           : parentHex;
 
-//     const parentNode = selectedNode.parentKey
-//       ? nodeMap[selectedNode.parentKey]
-//       : null;
+//       const parentNode = node.parentKey ? nodeMap[node.parentKey] : null;
+//       const parentLabel = parentNode ? parentNode.label : "";
 
-//     let question = meta.primaryQuestion;
+//       let question = meta.primaryQuestion;
 
-//     if (selectedNode.type === "primary") {
-//       question = meta.secondaryQuestionTemplate.replace(
-//         "{parent}",
-//         selectedNode.label.toLowerCase(),
-//       );
-//     }
+//       if (node.type === "secondary") {
+//         question = meta.secondaryQuestionTemplate.replace(
+//           "{parent}",
+//           parentLabel.toLowerCase(),
+//         );
+//       }
 
-//     if (selectedNode.type === "secondary") {
-//       question = meta.tertiaryQuestionTemplate.replace(
-//         "{parent}",
-//         selectedNode.label.toLowerCase(),
-//       );
-//     }
+//       if (node.type === "tertiary") {
+//         question = meta.tertiaryQuestionTemplate.replace(
+//           "{parent}",
+//           parentLabel.toLowerCase(),
+//         );
+//       }
 
-//     // ==========================================
-//     // 7. IF NO CHILDREN => FINISH
-//     // ==========================================
-//     if (!childNodes.length) {
-//       return res.status(200).json({
-//         status: "success",
-//         step: "finish",
-//         question: null,
-//         body: {
-//           questionId: selectedNode._id,
-//           key: selectedNode.key,
-//           label: selectedNode.label,
-//           type: selectedNode.type,
-//           bodyPartName,
-//           colorGroup: selectedNode.colorGroup || parentNode?.colorGroup || null,
-//           hexCode: selectedNode.hexCode?.inner
-//             ? selectedNode.hexCode
-//             : parentNode?.hexCode || {},
-//         },
-//       });
-//     }
+//       const children = childrenMap[node.key] || [];
 
-//     // ==========================================
-//     // 8. RETURN NEXT STEP OPTIONS
-//     // ==========================================
-//     return res.status(200).json({
-//       status: "success",
-//       step: selectedNode.type === "primary" ? "secondary" : "tertiary",
-//       question,
-//       body: childNodes.map((node) => ({
+//       return {
 //         questionId: node._id,
 //         key: node.key,
 //         label: node.label,
 //         type: node.type,
 //         bodyPartName,
-//         colorGroup: node.colorGroup || selectedNode.colorGroup,
-//         hexCode: node.hexCode?.inner ? node.hexCode : selectedNode.hexCode,
-//       })),
+//         colorGroup: color,
+//         hexCode: hex,
+//         question,
+//         options: children.map((child) =>
+//           buildTree(child, color, hex, bodyPartName),
+//         ),
+//       };
+//     };
+
+//     // 7. Build single result
+//     const result = buildTree(selectedNode, null, null, bodyPartName);
+
+//     // 8. Response
+//     return res.status(200).json({
+//       status: "success",
+//       body: result,
 //     });
 //   } catch (error) {
 //     console.error("Error in getQuestionsByParts:", error);
@@ -650,6 +504,128 @@ const getQuestionsByParts = async (req, res) => {
 //     });
 //   }
 // };
+
+const getQuestionsByParts = async (req, res) => {
+  try {
+    const { partId = null, bodyPartName = "" } = req.body;
+
+    const meta = await FeelingFormMeta.getSingleton();
+
+    const nodes = await FeelingNode.find({ isActive: true })
+      .sort({ order: 1, label: 1 })
+      .lean();
+
+    if (!nodes.length) {
+      return res.status(404).json({
+        status: "error",
+        message: "No nodes found",
+      });
+    }
+
+    // =====================================
+    // MAPS
+    // =====================================
+    const nodeMap = {};
+    const childrenMap = {};
+
+    nodes.forEach((node) => {
+      nodeMap[node.key] = node;
+
+      const parent = node.parentKey || null;
+
+      if (!childrenMap[parent]) {
+        childrenMap[parent] = [];
+      }
+
+      childrenMap[parent].push(node);
+    });
+
+    // =====================================
+    // STEP 1 PRIMARY QUESTION
+    // =====================================
+    if (!partId) {
+      return res.status(200).json({
+        status: "success",
+        step: "primary",
+        question: "How are you feeling today?",
+        body: (childrenMap[null] || []).map((item) => ({
+          questionId: item._id,
+          key: item.key,
+          label: item.label,
+          type: item.type,
+          colorGroup: item.colorGroup,
+          hexCode: item.hexCode,
+          bodyPartName,
+        })),
+      });
+    }
+
+    // =====================================
+    // SELECTED NODE
+    // =====================================
+    const selectedNode = nodeMap[partId];
+
+    if (!selectedNode) {
+      return res.status(404).json({
+        status: "error",
+        message: "Feeling not found",
+      });
+    }
+
+    const childNodes = childrenMap[selectedNode.key] || [];
+
+    // =====================================
+    // IF NO CHILDREN => FINISH
+    // =====================================
+    if (!childNodes.length) {
+      return res.status(200).json({
+        status: "success",
+        step: "finish",
+        question: null,
+        body: {
+          questionId: selectedNode._id,
+          key: selectedNode.key,
+          label: selectedNode.label,
+          type: selectedNode.type,
+          bodyPartName,
+        },
+      });
+    }
+
+    // =====================================
+    // SECONDARY / TERTIARY QUESTION
+    // =====================================
+    let question = "";
+
+    if (selectedNode.type === "primary") {
+      question = `What type of "${selectedNode.label.toLowerCase()}" feeling are you feeling?`;
+    }
+
+    if (selectedNode.type === "secondary") {
+      question = `Which type of "${selectedNode.label.toLowerCase()}" feeling are you feeling?`;
+    }
+
+    return res.status(200).json({
+      status: "success",
+      step: selectedNode.type === "primary" ? "secondary" : "tertiary",
+
+      question,
+
+      body: childNodes.map((item) => ({
+        questionId: item._id,
+        key: item.key,
+        label: item.label,
+        type: item.type,
+        bodyPartName,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
 
 // const savePatientFeelingAnswers = async (req, res) => {
 //   try {
